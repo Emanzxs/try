@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayMongo QR Ph Test — ₱1.00</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f1f5f9;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 2.5rem 3rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    h2 { margin-bottom: .25rem; color: #1e293b; }
+    p  { color: #64748b; margin-bottom: 2rem; }
+    .amount {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: #16a34a;
+      margin-bottom: 1.5rem;
+    }
+    button {
+      background: #16a34a;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: .9rem 2rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity .2s;
+    }
+    button:hover    { opacity: .85; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .status {
+      margin-top: 1.25rem;
+      font-size: .9rem;
+      color: #64748b;
+      min-height: 1.5rem;
+    }
+    .success { color: #16a34a; font-weight: 700; }
+    .error   { color: #dc2626; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>⚡ NORECO I</h2>
+  <p>PayMongo QR Ph — Live Test</p>
+  <div class="amount">₱1.00</div>
+  <button id="payBtn" onclick="startPayment()">📱 Pay ₱1.00 via QR Ph</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+  const PUBLIC_KEY = 'pk_live_1haw8GDy62ZJfon5Su2FfmPT';
+
+  // Check if we're back from a PayMongo redirect
+  const params  = new URLSearchParams(window.location.search);
+  const payment = params.get('payment');
+  if (payment === 'success') {
+    document.getElementById('status').className = 'status success';
+    document.getElementById('status').textContent = '✅ Payment successful! QR Ph confirmed.';
+    window.history.replaceState({}, '', window.location.pathname);
+  } else if (payment === 'failed') {
+    document.getElementById('status').className = 'status error';
+    document.getElementById('status').textContent = '❌ Payment failed or cancelled.';
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
+  async function startPayment() {
+    const btn    = document.getElementById('payBtn');
+    const status = document.getElementById('status');
+
+    btn.disabled     = true;
+    btn.textContent  = '⏳ Creating payment link…';
+    status.textContent = '';
+    status.className   = 'status';
+
+    try {
+      const response = await fetch('https://api.paymongo.com/v1/links', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': 'Basic ' + btoa(PUBLIC_KEY + ':'),
+        },
+        body: JSON.stringify({
+          data: {
+            attributes: {
+              amount:               100,        // 100 centavos = ₱1.00
+              currency:             'PHP',
+              description:          'NORECO I Test Payment',
+              remarks:              'QR Ph live test',
+              payment_method_types: ['qrph'],
+              redirect: {
+                success: window.location.href.split('?')[0] + '?payment=success',
+                failed:  window.location.href.split('?')[0] + '?payment=failed',
+              },
+            }
+          }
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errMsg = (data.errors && data.errors[0]) ? data.errors[0].detail : JSON.stringify(data);
+        throw new Error(errMsg);
+      }
+
+      const checkoutUrl = data.data.attributes.checkout_url;
+      status.textContent = '✅ Link created! Redirecting to QR Ph…';
+      status.className   = 'status success';
+
+      setTimeout(() => { window.location.href = checkoutUrl; }, 800);
+
+    } catch (err) {
+      console.error('PayMongo error:', err);
+      status.textContent = '❌ Error: ' + err.message;
+      status.className   = 'status error';
+      btn.disabled       = false;
+      btn.textContent    = '📱 Pay ₱1.00 via QR Ph';
+    }
+  }
+</script>
+
+</body>
+</html>
